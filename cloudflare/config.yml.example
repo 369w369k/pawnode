@@ -1,0 +1,17 @@
+# PawNode Cloudflare Tunnel — copy to config.yml via create-tunnel.ps1
+# Exposes go2rtc :1984 at https://stream.pawdomain.com
+# Exposes PawNode API :3000 at https://api.pawdomain.com
+
+tunnel: pawnode-stream
+credentials-file: C:\Users\YOU\.cloudflared\YOUR_TUNNEL_ID.json
+
+ingress:
+  - hostname: stream.pawdomain.com
+    service: http://127.0.0.1:1984
+    originRequest:
+      noTLSVerify: true
+  - hostname: api.pawdomain.com
+    service: http://127.0.0.1:3000
+    originRequest:
+      noTLSVerify: true
+  - service: http_status:404

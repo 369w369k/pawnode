@@ -1,0 +1,17 @@
+{
+  "name": "pawnode",
+  "version": "0.2.1",
+  "description": "PawNode MVP — Tapo RTSP relay and Petlibro feed gateway",
+  "main": "server/index.js",
+  "scripts": {
+    "start": "node server/index.js",
+    "dev": "node --watch server/index.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}

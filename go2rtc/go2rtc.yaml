@@ -1,0 +1,15 @@
+# Auto-generated from .env â€” Tapo C120 RTSP input
+api:
+  listen: ":1984"
+  # Allow WebSocket from chonkpaw.com (cross-origin native player). iframe embed works without this.
+  origin: "*"
+
+rtsp:
+  listen: ":8554"
+
+streams:
+  tapo:
+    - rtsp://beemobeemo:qwqwqwqw@10.0.0.16:554/stream1
+
+log:
+  level: info
