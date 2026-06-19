@@ -1,4 +1,19 @@
-# PawNode MVP v0.1
+# ARCHIVED — PawNode (Legacy)
+
+> **This repository is archived and read-only.**  
+> ChonkPaw v3 uses a new execution platform. Do not use PawNode code in new development.
+>
+> | v3 Repository | Role |
+> |---------------|------|
+> | [chonkpaw/chonkpaw-api](https://github.com/chonkpaw/chonkpaw-api) | Platform API (Execution) |
+> | [chonkpaw/chonkpaw-edge](https://github.com/chonkpaw/chonkpaw-edge) | Edge Agent |
+> | [chonkpaw/chonkpaw-wordpress](https://github.com/chonkpaw/chonkpaw-wordpress) | WordPress plugins & theme |
+>
+> Reference only. Archived: 2026-06-19.
+
+---
+
+# PawNode MVP v0.1 (Legacy)
 
 Windows 노트북에서 **Tapo C120** 실시간 영상(HLS)과 **Petlibro** 급식을 제공하는 단일 노드 게이트웨이입니다.
 
@@ -18,7 +33,7 @@ Cloudflare Tunnel (선택)
       ↓
 WordPress 스트리머 페이지
 
-간식주기 버튼 → WordPress REST → PawNode `POST /api/feed` → Petlibro Cloud API
+간식주기 버튼 → WordPress REST → PawNode `POST /api/feed` → PostgreSQL `feed_queue` → worker → Petlibro Cloud API
 ```
 
 ## 사전 요구
@@ -124,7 +139,7 @@ npm start
 | GET | `/health` | 노드 상태, go2rtc 연결 |
 | GET | `/stream` | HLS URL 반환 |
 | GET | `/devices` | 등록 Device 목록 |
-| **POST** | **`/api/feed`** | **간식 요청 → Petlibro Cloud** |
+| **POST** | **`/api/feed`** | **간식 요청 → `feed_queue` (202 Accepted)** |
 | **GET** | **`/api/feed-status`** | **마지막 급식 / cooldown 조회** |
 | POST | `/feed` | *(legacy)* `/api/feed` 와 동일 |
 
@@ -139,15 +154,32 @@ Request:
 }
 ```
 
-Flow: cooldown 검사 → log 생성 → `services/petlibro.js` → log 갱신 → JSON 응답
+Flow (`DATABASE_URL` 설정 시): cooldown 검사 → `feed_queue` INSERT → **HTTP 202** → `services/feed-worker.js`가 `FOR UPDATE SKIP LOCKED`로 처리 → 성공 시 `feed_logs` 기록
 
-Success:
+Accepted (HTTP **202**):
+
+```json
+{
+  "success": true,
+  "accepted": true,
+  "feed_id": 123,
+  "queue_id": 123,
+  "status": "pending",
+  "remaining": 3600,
+  "timestamp": null
+}
+```
+
+`DATABASE_URL` 없으면 기존 동기 방식(200 + 즉시 Petlibro 호출)으로 폴백합니다.
+
+Success (legacy sync, HTTP 200):
 
 ```json
 {
   "success": true,
   "feed_id": 123,
-  "remaining": 0
+  "remaining": 3600,
+  "timestamp": "2026-06-08T12:00:00.000Z"
 }
 ```
 
@@ -165,7 +197,29 @@ Cooldown active (HTTP 429):
 
 기본 cooldown: **30초** (`FEED_COOLDOWN_SECONDS`)
 
-Feed log (`data/feed-logs.jsonl`): `id`, `streamer`, `viewer`, `feed_time`, `status`, `response`
+Queue 모드: PostgreSQL `feed_logs` + `stream_feed_state` (JSON `data/feed-logs.jsonl` 대체)
+
+#### Feed queue worker
+
+```powershell
+# 1) 마이그레이션 (최초 1회)
+npm run migrate
+
+# 2) API 서버 (내장 worker — FEED_WORKER_ENABLED=true 기본값)
+npm start
+
+# 또는 worker 단독 프로세스 (API는 FEED_WORKER_ENABLED=false)
+npm run worker
+```
+
+`.env`:
+
+```
+DATABASE_URL=postgresql://user:pass@127.0.0.1:5432/chonkpaw
+FEED_QUEUE_ENABLED=true
+FEED_WORKER_ENABLED=true
+FEED_WORKER_POLL_MS=1000
+```
 
 #### GET /api/feed-status?streamer=beemo
 
